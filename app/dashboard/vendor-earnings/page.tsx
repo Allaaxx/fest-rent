@@ -35,7 +35,6 @@ export default function VendorEarningsPage() {
           router.push("/auth/login");
           return;
         }
-
         // Load vendor's stripe account id
         const { data: profile } = await supabase
           .from("users")
@@ -44,32 +43,14 @@ export default function VendorEarningsPage() {
           .single();
         setStripeAccountId(profile?.stripe_account_id ?? null);
 
-        // Get all rentals where user is owner
-        const { data: rentals, error: rentalsError } = await supabase
-          .from("rentals")
-          .select("id")
-          .eq("owner_id", user.id);
-
-        if (rentalsError) throw rentalsError;
-
-        if (rentals && rentals.length > 0) {
-          // Get payments for those rentals
-          const rentalIds = rentals.map((r: { id: string }) => r.id);
-          const { data: paymentsData, error: paymentsError } = await supabase
-            .from("payments")
-            .select("*")
-            .in("rental_id", rentalIds);
-
-          if (paymentsError) throw paymentsError;
-
-          setPayments(paymentsData || []);
-
-          const total =
-            (paymentsData as Payment[] | undefined)?.reduce(
-              (sum: number, p: Payment) => sum + p.amount,
-              0
-            ) || 0;
-          setTotalEarnings(total);
+        // Call server endpoint which uses service role to compute earnings
+        const res = await fetch("/api/vendor/earnings");
+        if (res.ok) {
+          const payload = await res.json();
+          setPayments(payload.payments || []);
+          setTotalEarnings(payload.total || 0);
+        } else {
+          console.error("Failed to fetch vendor earnings", await res.text());
         }
       } catch (error) {
         console.error("Error fetching payments:", error);

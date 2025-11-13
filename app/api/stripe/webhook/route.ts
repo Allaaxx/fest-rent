@@ -41,7 +41,10 @@ export async function POST(request: NextRequest) {
   // can update rentals/payments. Fall back to the server client if the service
   // role key is not available.
   let supabase = await createClient();
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (
+    process.env.SUPABASE_SERVICE_ROLE_KEY &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL
+  ) {
     supabase = createSupabaseClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -50,9 +53,51 @@ export async function POST(request: NextRequest) {
 
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as any;
-    const rentalId = session.metadata?.rentalId;
+    let rentalId = session.metadata?.rentalId;
 
-    console.log("Webhook received checkout.session.completed, rentalId=", rentalId);
+    console.log(
+      "Webhook received checkout.session.completed, rentalId=",
+      rentalId
+    );
+
+    // If metadata.rentalId is missing (e.g. when using Stripe fixtures),
+    // try to find the rental by the stripe_payment_id we stored when
+    // creating the Checkout Session.
+    if (!rentalId) {
+      try {
+        const { data: found, error: findError } = await supabase
+          .from("rentals")
+          .select("id")
+          .eq("stripe_payment_id", session.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (findError) {
+          console.error(
+            "Error searching rental by stripe_payment_id in webhook:",
+            findError
+          );
+        }
+
+        if (found && (found as any).id) {
+          rentalId = (found as any).id;
+          console.log(
+            "Found rental by stripe_payment_id in webhook, rentalId=",
+            rentalId
+          );
+        } else {
+          console.warn(
+            "checkout.session.completed received without rentalId metadata and no rental found by stripe_payment_id",
+            session.id
+          );
+        }
+      } catch (err) {
+        console.error(
+          "Exception while finding rental by stripe_payment_id:",
+          err
+        );
+      }
+    }
 
     if (rentalId) {
       // Update rental status to completed and record stripe session id
@@ -77,8 +122,6 @@ export async function POST(request: NextRequest) {
       if (paymentError) {
         console.error("Failed to insert payment from webhook:", paymentError);
       }
-    } else {
-      console.warn("checkout.session.completed received without rentalId metadata");
     }
   }
 
