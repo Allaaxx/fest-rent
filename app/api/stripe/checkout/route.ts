@@ -73,7 +73,8 @@ export async function POST(request: NextRequest) {
 
     if (updateError) throw updateError;
 
-    return NextResponse.json({ sessionId: session.id });
+    // Return session id and hosted checkout URL so client can redirect
+    return NextResponse.json({ sessionId: session.id, url: (session as any).url });
   } catch (error) {
     console.error("Stripe error:", error);
     return NextResponse.json(

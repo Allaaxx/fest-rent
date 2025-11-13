@@ -19,6 +19,8 @@ interface Payment {
 export default function VendorEarningsPage() {
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
+  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null)
+  const [connecting, setConnecting] = useState(false)
   const [totalEarnings, setTotalEarnings] = useState(0)
   const router = useRouter()
   const supabase = createClient()
@@ -34,6 +36,10 @@ export default function VendorEarningsPage() {
           return
         }
 
+        // Load vendor's stripe account id
+        const { data: profile } = await supabase.from("users").select("stripe_account_id").eq("id", user.id).single()
+        setStripeAccountId(profile?.stripe_account_id ?? null)
+
         // Get all rentals where user is owner
         const { data: rentals, error: rentalsError } = await supabase
           .from("rentals")
@@ -44,7 +50,7 @@ export default function VendorEarningsPage() {
 
         if (rentals && rentals.length > 0) {
           // Get payments for those rentals
-          const rentalIds = rentals.map((r) => r.id)
+          const rentalIds = rentals.map((r: { id: string }) => r.id)
           const { data: paymentsData, error: paymentsError } = await supabase
             .from("payments")
             .select("*")
@@ -54,7 +60,7 @@ export default function VendorEarningsPage() {
 
           setPayments(paymentsData || [])
 
-          const total = paymentsData?.reduce((sum, p) => sum + p.amount, 0) || 0
+          const total = (paymentsData as Payment[] | undefined)?.reduce((sum: number, p: Payment) => sum + p.amount, 0) || 0
           setTotalEarnings(total)
         }
       } catch (error) {
@@ -67,16 +73,35 @@ export default function VendorEarningsPage() {
     fetchPayments()
   }, [router, supabase])
 
+  const handleConnect = async () => {
+    setConnecting(true)
+    try {
+      const res = await fetch("/api/stripe/connect-account", { method: "POST" })
+      const payload = await res.json()
+
+      if (!res.ok) {
+        throw new Error(payload?.error || "Failed to create Stripe account")
+      }
+
+      setStripeAccountId(payload.account_id ?? null)
+    } catch (err) {
+      console.error("Connect failed:", err)
+      alert(err instanceof Error ? err.message : "Connect failed")
+    } finally {
+      setConnecting(false)
+    }
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 to-slate-800">
         <Spinner className="text-blue-500" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 to-slate-800">
       <header className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm">
         <nav className="mx-auto max-w-7xl flex items-center justify-between px-6 py-4">
           <Link href="/" className="text-2xl font-bold text-white">
@@ -95,10 +120,23 @@ export default function VendorEarningsPage() {
           <h1 className="text-3xl font-bold text-white">Earnings</h1>
         </div>
 
-        <Card className="mb-8 bg-gradient-to-br from-blue-900 to-blue-800 border-blue-700">
+        <Card className="mb-8 bg-linear-to-br from-blue-900 to-blue-800 border-blue-700">
           <CardContent className="pt-6">
             <p className="text-blue-200 text-sm mb-2">Total Earnings</p>
             <p className="text-4xl font-bold text-white">${totalEarnings.toFixed(2)}</p>
+            <div className="mt-4">
+              {stripeAccountId ? (
+                <div className="text-sm text-slate-300">
+                  Connected: <span className="font-mono ml-2">{stripeAccountId}</span>
+                </div>
+              ) : (
+                <div>
+                  <Button onClick={handleConnect} disabled={connecting}>
+                    {connecting ? "Connecting..." : "Connect Stripe Account"}
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
 
