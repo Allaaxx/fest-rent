@@ -31,6 +31,7 @@ interface Rental {
   end_date: string;
   total_value: number;
   status: string;
+  stripe_payment_id?: string | null;
 }
 
 interface Equipment {
@@ -119,7 +120,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 to-slate-800">
         <Spinner className="text-blue-500" />
       </div>
     );
@@ -132,7 +133,7 @@ export default function DashboardPage() {
   const pendingCount = incomingRequests.length;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 to-slate-800">
       <header className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm">
         <nav className="mx-auto max-w-7xl flex items-center justify-between px-6 py-4">
           <Link href="/" className="text-2xl font-bold text-white">
@@ -217,48 +218,65 @@ export default function DashboardPage() {
                           </p>
                         </div>
                         <div className="flex flex-col items-end gap-3">
-                          {rental.status === "approved" && (
-                            <Button
-                              onClick={async () => {
-                                try {
-                                  // Amount in cents
-                                  const amountInCents = Math.round(
-                                    rental.total_value * 100
-                                  );
-                                  const res = await fetch(
-                                    "/api/stripe/checkout",
-                                    {
-                                      method: "POST",
-                                      headers: {
-                                        "Content-Type": "application/json",
-                                      },
-                                      body: JSON.stringify({
-                                        rentalId: rental.id,
-                                        amount: amountInCents,
-                                      }),
-                                    }
-                                  );
+                          {(() => {
+                            if (rental.status === "approved") {
+                              if (rental.stripe_payment_id) {
+                                return (
+                                  <div className="text-yellow-300 font-semibold">
+                                    Payment in progress
+                                  </div>
+                                );
+                              }
 
-                                  const payload = await res.json();
-                                  if (!res.ok)
-                                    throw new Error(
-                                      payload?.error || "Checkout failed"
-                                    );
-                                  const url = payload.url;
-                                  if (url) window.location.href = url;
-                                } catch (err) {
-                                  alert(
-                                    err instanceof Error
-                                      ? err.message
-                                      : String(err)
-                                  );
-                                }
-                              }}
-                              className="bg-blue-600 hover:bg-blue-700"
-                            >
-                              Pay
-                            </Button>
-                          )}
+                              return (
+                                <Button
+                                  onClick={async () => {
+                                    try {
+                                      const res = await fetch(
+                                        "/api/stripe/checkout",
+                                        {
+                                          method: "POST",
+                                          headers: {
+                                            "Content-Type": "application/json",
+                                          },
+                                          body: JSON.stringify({
+                                            rentalId: rental.id,
+                                          }),
+                                        }
+                                      );
+
+                                      const payload = await res.json();
+                                      if (!res.ok)
+                                        throw new Error(
+                                          payload?.error || "Checkout failed"
+                                        );
+                                      const url = payload.url;
+                                      if (url) window.location.href = url;
+                                    } catch (err) {
+                                      alert(
+                                        err instanceof Error
+                                          ? err.message
+                                          : String(err)
+                                      );
+                                    }
+                                  }}
+                                  className="bg-blue-600 hover:bg-blue-700"
+                                >
+                                  Pay
+                                </Button>
+                              );
+                            }
+
+                            if (rental.status === "completed") {
+                              return (
+                                <div className="text-green-400 font-semibold">
+                                  Payment received
+                                </div>
+                              );
+                            }
+
+                            return null;
+                          })()}
                         </div>
                         <span
                           className={`px-3 py-1 rounded-full text-sm font-semibold ${
@@ -266,6 +284,8 @@ export default function DashboardPage() {
                               ? "bg-green-900/30 text-green-300"
                               : rental.status === "pending"
                               ? "bg-yellow-900/30 text-yellow-300"
+                              : rental.status === "completed"
+                              ? "bg-green-900/50 text-green-200"
                               : "bg-red-900/30 text-red-300"
                           }`}
                         >

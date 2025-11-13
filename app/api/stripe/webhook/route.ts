@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { type NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
@@ -35,27 +36,49 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  const supabase = await createClient();
+  // Create a Supabase client. For webhooks (which are unauthenticated requests)
+  // we should prefer using the Service Role key to bypass RLS so the webhook
+  // can update rentals/payments. Fall back to the server client if the service
+  // role key is not available.
+  let supabase = await createClient();
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+  }
 
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
+    const session = event.data.object as any;
     const rentalId = session.metadata?.rentalId;
 
+    console.log("Webhook received checkout.session.completed, rentalId=", rentalId);
+
     if (rentalId) {
-      // Update rental status to approved
-      await supabase
+      // Update rental status to completed and record stripe session id
+      const { error: updateError } = await supabase
         .from("rentals")
-        .update({ status: "approved" })
+        .update({ status: "completed", stripe_payment_id: session.id })
         .eq("id", rentalId);
+
+      if (updateError) {
+        console.error("Failed to update rental from webhook:", updateError);
+      }
 
       // Create payment record (guard against nullable amount_total)
       const totalCents = (session.amount_total ?? 0) as number;
-      await supabase.from("payments").insert({
+      const { error: paymentError } = await supabase.from("payments").insert({
         rental_id: rentalId,
         amount: totalCents / 100,
         status: "completed",
         stripe_session_id: session.id,
       });
+
+      if (paymentError) {
+        console.error("Failed to insert payment from webhook:", paymentError);
+      }
+    } else {
+      console.warn("checkout.session.completed received without rentalId metadata");
     }
   }
 
