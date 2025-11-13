@@ -22,26 +22,63 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Create Stripe Connect account
-    const account = await stripe.accounts.create({
-      type: "express",
-      country: "US",
-      email: user.email,
-    });
-
-    // Update user with Stripe account ID
-    const { error: updateError } = await supabase
+    // Ensure only vendors can create/connect a Stripe account
+    const { data: profile } = await supabase
       .from("users")
-      .update({ stripe_account_id: account.id })
-      .eq("id", user.id);
+      .select("stripe_account_id, role")
+      .eq("id", user.id)
+      .single();
 
-    if (updateError) throw updateError;
+    if (!profile || profile.role !== "vendor") {
+      return NextResponse.json(
+        { error: "Forbidden: only vendors may connect a Stripe account" },
+        { status: 403 }
+      );
+    }
 
-    return NextResponse.json({ account_id: account.id });
+    let accountId = profile?.stripe_account_id;
+
+    if (!accountId) {
+      // Create Stripe Connect account (default country set to BR for vendors)
+      const account = await stripe.accounts.create({
+        type: "express",
+        country: "BR",
+        email: user.email,
+      });
+
+      accountId = account.id;
+
+      // Update user with Stripe account ID
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ stripe_account_id: accountId })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+    }
+
+    // Create an account link for onboarding (or refresh existing onboarding)
+    const origin = request.nextUrl?.origin ?? "";
+    const returnUrl = `${origin}/dashboard`;
+    const refreshUrl = `${origin}/dashboard`;
+
+    const accountLink = await stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: refreshUrl,
+      return_url: returnUrl,
+      type: "account_onboarding",
+    } as any);
+
+    return NextResponse.json({
+      account_id: accountId,
+      url: (accountLink as any).url,
+    });
   } catch (error) {
     console.error("Stripe error:", error);
+    // Return error details to help debugging in development
+    const details = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: "Failed to create Stripe account" },
+      { error: "Failed to create Stripe account", details },
       { status: 500 }
     );
   }

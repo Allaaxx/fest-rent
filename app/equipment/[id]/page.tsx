@@ -121,65 +121,11 @@ export default function EquipmentDetailPage({
 
       const rentalIdInserted = insertedRentals?.id;
 
-      // Fetch vendor's Stripe account id
-      const { data: ownerProfile, error: ownerError } = await supabase
-        .from("users")
-        .select("stripe_account_id")
-        .eq("id", equipment.owner_id)
-        .single();
-
-      if (ownerError) throw ownerError;
-
-      const vendorStripeId = ownerProfile?.stripe_account_id;
-
-      if (!vendorStripeId) {
-        setSuccessMessage(
-          "Booking request created. Vendor has not connected Stripe."
-        );
-        setTimeout(() => router.push("/dashboard"), 2000);
-        return;
-      }
-
-      // Amount in cents
-      const amountInCents = Math.round(totalValue * 100);
-
-      // Call checkout endpoint to create Stripe Checkout session
-      try {
-        const res = await fetch("/api/stripe/checkout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            rentalId: rentalIdInserted,
-            amount: amountInCents,
-            vendorStripeId,
-          }),
-        });
-
-        const payload = await res.json();
-
-        if (!res.ok) {
-          throw new Error(
-            payload?.error || "Failed to create checkout session"
-          );
-        }
-
-        const checkoutUrl = payload.url;
-
-        if (checkoutUrl) {
-          // Redirect user to Stripe Checkout
-          window.location.href = checkoutUrl;
-        } else {
-          // Fallback: notify and redirect to dashboard
-          setSuccessMessage(
-            "Booking request created! Proceeding to dashboard..."
-          );
-          setTimeout(() => router.push("/dashboard"), 2000);
-        }
-      } catch (err) {
-        console.error("Checkout creation failed:", err);
-        setError(err instanceof Error ? err.message : "Checkout failed");
-        setTimeout(() => router.push("/dashboard"), 2000);
-      }
+      // Do not start payment here. Rentals are paid only after vendor approves the request.
+      setSuccessMessage(
+        "Booking request created! Waiting for vendor approval..."
+      );
+      setTimeout(() => router.push("/dashboard"), 2000);
     } catch (error) {
       setError(error instanceof Error ? error.message : "Booking failed");
     } finally {
