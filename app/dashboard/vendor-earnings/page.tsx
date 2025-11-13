@@ -1,103 +1,122 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Spinner } from "@/components/ui/spinner"
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Spinner } from "@/components/ui/spinner";
 
 interface Payment {
-  id: string
-  rental_id: string
-  amount: number
-  status: string
-  created_at: string
+  id: string;
+  rental_id: string;
+  amount: number;
+  status: string;
+  created_at: string;
 }
 
 export default function VendorEarningsPage() {
-  const [payments, setPayments] = useState<Payment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null)
-  const [connecting, setConnecting] = useState(false)
-  const [totalEarnings, setTotalEarnings] = useState(0)
-  const router = useRouter()
-  const supabase = createClient()
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const router = useRouter();
+  const supabase = createClient();
 
   useEffect(() => {
     const fetchPayments = async () => {
       try {
         const {
           data: { user },
-        } = await supabase.auth.getUser()
+        } = await supabase.auth.getUser();
         if (!user) {
-          router.push("/auth/login")
-          return
+          router.push("/auth/login");
+          return;
         }
 
         // Load vendor's stripe account id
-        const { data: profile } = await supabase.from("users").select("stripe_account_id").eq("id", user.id).single()
-        setStripeAccountId(profile?.stripe_account_id ?? null)
+        const { data: profile } = await supabase
+          .from("users")
+          .select("stripe_account_id")
+          .eq("id", user.id)
+          .single();
+        setStripeAccountId(profile?.stripe_account_id ?? null);
 
         // Get all rentals where user is owner
         const { data: rentals, error: rentalsError } = await supabase
           .from("rentals")
           .select("id")
-          .eq("owner_id", user.id)
+          .eq("owner_id", user.id);
 
-        if (rentalsError) throw rentalsError
+        if (rentalsError) throw rentalsError;
 
         if (rentals && rentals.length > 0) {
           // Get payments for those rentals
-          const rentalIds = rentals.map((r: { id: string }) => r.id)
+          const rentalIds = rentals.map((r: { id: string }) => r.id);
           const { data: paymentsData, error: paymentsError } = await supabase
             .from("payments")
             .select("*")
-            .in("rental_id", rentalIds)
+            .in("rental_id", rentalIds);
 
-          if (paymentsError) throw paymentsError
+          if (paymentsError) throw paymentsError;
 
-          setPayments(paymentsData || [])
+          setPayments(paymentsData || []);
 
-          const total = (paymentsData as Payment[] | undefined)?.reduce((sum: number, p: Payment) => sum + p.amount, 0) || 0
-          setTotalEarnings(total)
+          const total =
+            (paymentsData as Payment[] | undefined)?.reduce(
+              (sum: number, p: Payment) => sum + p.amount,
+              0
+            ) || 0;
+          setTotalEarnings(total);
         }
       } catch (error) {
-        console.error("Error fetching payments:", error)
+        console.error("Error fetching payments:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchPayments()
-  }, [router, supabase])
+    fetchPayments();
+  }, [router, supabase]);
 
   const handleConnect = async () => {
-    setConnecting(true)
+    setConnecting(true);
     try {
-      const res = await fetch("/api/stripe/connect-account", { method: "POST" })
-      const payload = await res.json()
+      const res = await fetch("/api/stripe/connect-account", {
+        method: "POST",
+      });
+      const payload = await res.json();
 
       if (!res.ok) {
-        throw new Error(payload?.error || "Failed to create Stripe account")
+        const details = payload?.details ? `: ${payload.details}` : "";
+        throw new Error(
+          (payload?.error ?? "Failed to create Stripe account") + details
+        );
       }
 
-      setStripeAccountId(payload.account_id ?? null)
+      // If server returned an onboarding URL, redirect vendor to Stripe onboarding
+      if (payload.url) {
+        window.location.href = payload.url;
+        return;
+      }
+
+      setStripeAccountId(payload.account_id ?? null);
     } catch (err) {
-      console.error("Connect failed:", err)
-      alert(err instanceof Error ? err.message : "Connect failed")
+      console.error("Connect failed:", err);
+      alert(err instanceof Error ? err.message : "Connect failed");
     } finally {
-      setConnecting(false)
+      setConnecting(false);
     }
-  }
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 to-slate-800">
         <Spinner className="text-blue-500" />
       </div>
-    )
+    );
   }
 
   return (
@@ -123,11 +142,14 @@ export default function VendorEarningsPage() {
         <Card className="mb-8 bg-linear-to-br from-blue-900 to-blue-800 border-blue-700">
           <CardContent className="pt-6">
             <p className="text-blue-200 text-sm mb-2">Total Earnings</p>
-            <p className="text-4xl font-bold text-white">${totalEarnings.toFixed(2)}</p>
+            <p className="text-4xl font-bold text-white">
+              ${totalEarnings.toFixed(2)}
+            </p>
             <div className="mt-4">
               {stripeAccountId ? (
                 <div className="text-sm text-slate-300">
-                  Connected: <span className="font-mono ml-2">{stripeAccountId}</span>
+                  Connected:{" "}
+                  <span className="font-mono ml-2">{stripeAccountId}</span>
                 </div>
               ) : (
                 <div>
@@ -153,12 +175,20 @@ export default function VendorEarningsPage() {
                 <CardContent className="pt-6">
                   <div className="flex justify-between items-center">
                     <div>
-                      <p className="font-semibold text-white">Payment Received</p>
-                      <p className="text-sm text-slate-400">{new Date(payment.created_at).toLocaleDateString()}</p>
+                      <p className="font-semibold text-white">
+                        Payment Received
+                      </p>
+                      <p className="text-sm text-slate-400">
+                        {new Date(payment.created_at).toLocaleDateString()}
+                      </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-2xl font-bold text-green-400">${payment.amount.toFixed(2)}</p>
-                      <span className="text-xs px-2 py-1 rounded bg-green-900/30 text-green-300">{payment.status}</span>
+                      <p className="text-2xl font-bold text-green-400">
+                        ${payment.amount.toFixed(2)}
+                      </p>
+                      <span className="text-xs px-2 py-1 rounded bg-green-900/30 text-green-300">
+                        {payment.status}
+                      </span>
                     </div>
                   </div>
                 </CardContent>
@@ -168,5 +198,5 @@ export default function VendorEarningsPage() {
         )}
       </main>
     </div>
-  )
+  );
 }
