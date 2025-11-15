@@ -60,6 +60,9 @@ export async function POST(request: NextRequest) {
       rentalId
     );
 
+    console.log("session.id=", session.id);
+    console.log("session.metadata=", session.metadata);
+
     // If metadata.rentalId is missing (e.g. when using Stripe fixtures),
     // try to find the rental by the stripe_payment_id we stored when
     // creating the Checkout Session.
@@ -101,26 +104,42 @@ export async function POST(request: NextRequest) {
 
     if (rentalId) {
       // Update rental status to completed and record stripe session id
-      const { error: updateError } = await supabase
-        .from("rentals")
-        .update({ status: "completed", stripe_payment_id: session.id })
-        .eq("id", rentalId);
+      try {
+        const { data: updatedRental, error: updateError } = await supabase
+          .from("rentals")
+          .update({ status: "completed", stripe_payment_id: session.id })
+          .eq("id", rentalId)
+          .select();
 
-      if (updateError) {
-        console.error("Failed to update rental from webhook:", updateError);
+        if (updateError) {
+          console.error("Failed to update rental from webhook:", updateError);
+        } else {
+          console.log("Updated rental from webhook:", updatedRental);
+        }
+      } catch (err) {
+        console.error("Exception while updating rental from webhook:", err);
       }
 
       // Create payment record (guard against nullable amount_total)
-      const totalCents = (session.amount_total ?? 0) as number;
-      const { error: paymentError } = await supabase.from("payments").insert({
-        rental_id: rentalId,
-        amount: totalCents / 100,
-        status: "completed",
-        stripe_session_id: session.id,
-      });
+      try {
+        const totalCents = (session.amount_total ?? 0) as number;
+        const { data: paymentRow, error: paymentError } = await supabase
+          .from("payments")
+          .insert({
+            rental_id: rentalId,
+            amount: totalCents / 100,
+            status: "completed",
+            stripe_session_id: session.id,
+          })
+          .select();
 
-      if (paymentError) {
-        console.error("Failed to insert payment from webhook:", paymentError);
+        if (paymentError) {
+          console.error("Failed to insert payment from webhook:", paymentError);
+        } else {
+          console.log("Inserted payment from webhook:", paymentRow);
+        }
+      } catch (err) {
+        console.error("Exception while inserting payment from webhook:", err);
       }
     }
   }

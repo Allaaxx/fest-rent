@@ -2,6 +2,12 @@ import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
 export async function updateSession(request: NextRequest) {
+  // Allow unauthenticated access to the Stripe webhook and other API webhooks
+  // so external providers can POST without being redirected to login.
+  if (request.nextUrl.pathname.startsWith("/api/stripe/webhook")) {
+    return NextResponse.next({ request })
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
