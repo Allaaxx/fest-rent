@@ -146,14 +146,50 @@ export async function POST(request: NextRequest) {
 
   if (event.type === "checkout.session.expired") {
     const session = event.data.object;
-    const rentalId = session.metadata?.rentalId;
+    let rentalId = session.metadata?.rentalId as string | undefined;
+
+    // If metadata.rentalId missing, try to find by stripe_payment_id
+    if (!rentalId) {
+      try {
+        const { data: found, error: findError } = await supabase
+          .from("rentals")
+          .select("id")
+          .eq("stripe_payment_id", session.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (findError) {
+          console.error("Error finding rental for expired session:", findError);
+        }
+
+        if (found && (found as { id?: string }).id) {
+          rentalId = (found as { id?: string }).id;
+          console.log("Found rental for expired session, rentalId=", rentalId);
+        }
+      } catch (err) {
+        console.error("Exception while finding rental for expired session:", err);
+      }
+    }
 
     if (rentalId) {
-      // Update rental status to rejected
-      await supabase
-        .from("rentals")
-        .update({ status: "rejected" })
-        .eq("id", rentalId);
+      // When a Checkout Session expires without payment, clear the
+      // `stripe_payment_id` so the renter can attempt payment again.
+      // Restore the rental `status` to "approved" so the Pay button
+      // reappears (the checkout route only allows payments for approved rentals).
+      try {
+        const { error: updateErr } = await supabase
+          .from("rentals")
+          .update({ stripe_payment_id: null, status: "approved" })
+          .eq("id", rentalId);
+
+        if (updateErr) {
+          console.error("Failed to update rental for expired session:", updateErr);
+        } else {
+          console.log("Cleared stripe_payment_id and restored status=approved for rental", rentalId);
+        }
+      } catch (err) {
+        console.error("Exception while updating rental for expired session:", err);
+      }
     }
   }
 
