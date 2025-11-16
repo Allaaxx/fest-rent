@@ -1,4 +1,3 @@
-import Stripe from "stripe";
 
 describe("Payment Processing with Stripe", () => {
   let stripe: any;
