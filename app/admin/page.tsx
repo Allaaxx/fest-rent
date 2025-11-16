@@ -96,7 +96,7 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 to-slate-800">
         <Spinner className="text-blue-500" />
       </div>
     )
@@ -104,7 +104,7 @@ export default function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 to-slate-800">
         <Card className="bg-slate-800 border-slate-700">
           <CardContent className="pt-6">
             <p className="text-slate-300">Access denied. Admin only.</p>
@@ -122,7 +122,7 @@ export default function AdminPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 to-slate-800">
       {/* Header */}
       <header className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm">
         <nav className="mx-auto max-w-7xl flex items-center justify-between px-6 py-4">

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 export default function CheckoutSuccessPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 to-slate-800 p-4">
       <Card className="w-full max-w-md bg-slate-800 border-slate-700 text-center">
         <CardHeader>
           <CardTitle className="text-white text-2xl">Payment Successful!</CardTitle>
