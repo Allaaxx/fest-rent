@@ -28,17 +28,24 @@ interface Equipment {
   owner_id: string;
 }
 
-export default function EquipmentDetailPage({
-  params,
-}: {
-  // `params` may be a Promise in Next.js 16; unwrap with React.use()
-  params: any;
-}) {
-  // React.use() unwraps Promises passed to client components in Next.js 16
-  const resolvedParams = (React as any).use
-    ? (React as any).use(params)
-    : params;
-  const id = resolvedParams?.id;
+export default function EquipmentDetailPage({ params }: { params: { id?: string } | Promise<{ id?: string }> }) {
+  // `params` may be a plain object or a Promise<{ id?: string }>
+  // Extract id synchronously if available, otherwise resolve the promise in an effect.
+  const initialId = params && typeof (params as { id?: string }).id === 'string' ? (params as { id?: string }).id : undefined;
+  const [id, setId] = useState<string | undefined>(initialId);
+
+  useEffect(() => {
+    // If params is a Promise, resolve it and set id
+    const maybePromise = params as Promise<{ id?: string }> | { id?: string } | undefined;
+
+    const isPromise = (p: unknown): p is Promise<{ id?: string }> =>
+      !!p && typeof (p as Promise<{ id?: string }>).then === "function";
+
+    if (isPromise(maybePromise)) {
+      maybePromise.then((p) => setId(p?.id)).catch(() => {});
+    }
+    // otherwise id already set from initialId
+  }, [params]);
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState("");
@@ -103,7 +110,7 @@ export default function EquipmentDetailPage({
 
       const totalValue = days * equipment.price_per_day;
 
-      const { data: insertedRentals, error: rentalError } = await supabase
+      const { error: rentalError } = await supabase
         .from("rentals")
         .insert({
           equipment_id: equipment.id,
@@ -118,8 +125,6 @@ export default function EquipmentDetailPage({
         .single();
 
       if (rentalError) throw rentalError;
-
-      const rentalIdInserted = insertedRentals?.id;
 
       // Do not start payment here. Rentals are paid only after vendor approves the request.
       setSuccessMessage(
@@ -181,6 +186,7 @@ export default function EquipmentDetailPage({
           {/* Images */}
           <div className="bg-slate-700 rounded-lg aspect-square flex items-center justify-center">
             {equipment.image_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={equipment.image_url}
                 alt={equipment.name}
