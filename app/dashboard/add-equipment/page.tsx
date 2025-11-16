@@ -1,64 +1,94 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Trash } from "lucide-react"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import /*Alert, AlertDescription*/ "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
+import { Trash } from "lucide-react";
 
-const CATEGORIES = ["Audio", "Video", "Lighting", "Tent", "Table", "Chair", "Decoration", "Other"]
+const CATEGORIES = [
+  "Audio",
+  "Video",
+  "Lighting",
+  "Tent",
+  "Table",
+  "Chair",
+  "Decoration",
+  "Other",
+];
 
 export default function AddEquipmentPage() {
-  const [name, setName] = useState("")
-  const [description, setDescription] = useState("")
-  const [category, setCategory] = useState("")
-  const [pricePerDay, setPricePerDay] = useState("")
-  const [file, setFile] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const router = useRouter()
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState("");
+  const [pricePerDay, setPricePerDay] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const { toast, dismiss } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccessMessage(null)
+    e.preventDefault();
+    dismiss();
 
     if (!name || !category || !pricePerDay) {
-      setError("Please fill in all required fields")
-      return
+      toast({
+        title: "Missing fields",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
     }
 
-    setIsLoading(true)
+    setIsLoading(true);
 
     try {
-      let uploadedImageUrl: string | null = null
+      let uploadedImageUrl: string | null = null;
       if (file) {
         // Upload via server endpoint which uses the service role key
-        const formData = new FormData()
-        formData.append("file", file)
+        const formData = new FormData();
+        formData.append("file", file);
 
-        console.log("Uploading file to /api/upload (server-side upload)", file.name)
-        const uploadRes = await fetch("/api/upload", { method: "POST", body: formData })
+        console.log(
+          "Uploading file to /api/upload (server-side upload)",
+          file.name
+        );
+        const uploadRes = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
 
         if (!uploadRes.ok) {
-          const errBody = await uploadRes.json().catch(() => null)
-          throw new Error(errBody?.error || "Server upload failed")
+          const errBody = await uploadRes.json().catch(() => null);
+          throw new Error(errBody?.error || "Server upload failed");
         }
 
-        const uploadJson = await uploadRes.json()
-        console.log("uploadJson:", uploadJson)
+        const uploadJson = await uploadRes.json();
+        console.log("uploadJson:", uploadJson);
         // Prefer publicUrl, fall back to signedUrl when bucket is private
-        uploadedImageUrl = uploadJson.publicUrl ?? uploadJson.signedUrl ?? null
+        uploadedImageUrl = uploadJson.publicUrl ?? uploadJson.signedUrl ?? null;
       }
       const response = await fetch("/api/equipment", {
         method: "POST",
@@ -70,37 +100,43 @@ export default function AddEquipmentPage() {
           price_per_day: Number.parseFloat(pricePerDay),
           image_url: uploadedImageUrl || null,
         }),
-      })
+      });
 
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || "Failed to add equipment")
+        const data = await response.json();
+        throw new Error(data.error || "Failed to add equipment");
       }
 
-      setSuccessMessage("Equipment added successfully!")
-      setTimeout(() => router.push("/dashboard"), 2000)
+      toast({
+        title: "Equipment added",
+        description: "Equipment added successfully!",
+        variant: "default",
+      });
+      setTimeout(() => router.push("/dashboard"), 2000);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Failed to add equipment")
+      const msg =
+        error instanceof Error ? error.message : "Failed to add equipment";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   useEffect(() => {
     if (!file) {
-      setPreviewUrl(null)
-      return
+      setPreviewUrl(null);
+      return;
     }
 
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
 
     return () => {
       try {
-        URL.revokeObjectURL(url)
+        URL.revokeObjectURL(url);
       } catch {}
-    }
-  }, [file])
+    };
+  }, [file]);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-900 to-slate-800">
@@ -126,16 +162,7 @@ export default function AddEquipmentPage() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <Alert className="bg-red-900/20 border-red-800">
-                  <AlertDescription className="text-red-200">{error}</AlertDescription>
-                </Alert>
-              )}
-              {successMessage && (
-                <Alert className="bg-green-900/20 border-green-800">
-                  <AlertDescription className="text-green-200">{successMessage}</AlertDescription>
-                </Alert>
-              )}
+              {/* Notifications are shown via toasts (Toaster mounted in layout) */}
 
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-slate-200">
@@ -176,7 +203,11 @@ export default function AddEquipmentPage() {
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
                       {CATEGORIES.map((cat) => (
-                        <SelectItem key={cat} value={cat} className="text-white">
+                        <SelectItem
+                          key={cat}
+                          value={cat}
+                          className="text-white"
+                        >
                           {cat}
                         </SelectItem>
                       ))}
@@ -210,42 +241,60 @@ export default function AddEquipmentPage() {
                   tabIndex={0}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => {
-                    e.preventDefault()
-                    const dropped = e.dataTransfer?.files?.[0] ?? null
-                    if (!dropped) return
+                    e.preventDefault();
+                    const dropped = e.dataTransfer?.files?.[0] ?? null;
+                    if (!dropped) return;
                     // validate
                     if (!dropped.type.startsWith("image/")) {
-                      setError("Please upload an image file")
-                      return
+                      toast({
+                        title: "Invalid file",
+                        description: "Please upload an image file",
+                        variant: "destructive",
+                      });
+                      return;
                     }
-                    const maxSize = 5 * 1024 * 1024 // 5MB
+                    const maxSize = 5 * 1024 * 1024; // 5MB
                     if (dropped.size > maxSize) {
-                      setError("File is too large (max 5MB)")
-                      return
+                      toast({
+                        title: "File too large",
+                        description: "File is too large (max 5MB)",
+                        variant: "destructive",
+                      });
+                      return;
                     }
-                    setError(null)
-                    setFile(dropped)
+                    dismiss();
+                    setFile(dropped);
                   }}
                   className="relative flex flex-col items-center justify-center gap-3 rounded-md border-2 border-dashed border-slate-600 bg-slate-700/40 px-4 py-8 text-center text-slate-300 hover:border-slate-500 focus:outline-none"
                 >
-                  <div className="text-sm">Arraste e solte uma imagem aqui, ou clique para selecionar</div>
+                  <div className="text-sm">
+                    Arraste e solte uma imagem aqui, ou clique para selecionar
+                  </div>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => {
-                      const f = e.target.files?.[0] ?? null
-                      if (!f) return
+                      const f = e.target.files?.[0] ?? null;
+                      if (!f) return;
                       if (!f.type.startsWith("image/")) {
-                        setError("Por favor envie um arquivo de imagem")
-                        return
+                        toast({
+                          title: "Arquivo inválido",
+                          description: "Por favor envie um arquivo de imagem",
+                          variant: "destructive",
+                        });
+                        return;
                       }
-                      const maxSize = 5 * 1024 * 1024
+                      const maxSize = 5 * 1024 * 1024;
                       if (f.size > maxSize) {
-                        setError("Arquivo muito grande (máx. 5MB)")
-                        return
+                        toast({
+                          title: "Arquivo muito grande",
+                          description: "Arquivo muito grande (máx. 5MB)",
+                          variant: "destructive",
+                        });
+                        return;
                       }
-                      setError(null)
-                      setFile(f)
+                      dismiss();
+                      setFile(f);
                     }}
                     className="absolute inset-0 h-full w-full opacity-0 cursor-pointer"
                   />
@@ -256,17 +305,23 @@ export default function AddEquipmentPage() {
                     <div className="w-24 h-24 overflow-hidden rounded-md bg-slate-800">
                       {/* Preview using object URL (local preview) */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={previewUrl ?? undefined} alt="preview" className="w-full h-full object-cover" />
+                      <img
+                        src={previewUrl ?? undefined}
+                        alt="preview"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="flex-1">
                       <div className="text-slate-200">{file.name}</div>
-                      <div className="text-slate-400 text-sm">{(file.size / 1024).toFixed(0)} KB</div>
+                      <div className="text-slate-400 text-sm">
+                        {(file.size / 1024).toFixed(0)} KB
+                      </div>
                       <div className="mt-2 bg-slate-100 w-10 rounded-lg">
                         <Button
                           variant="ghost"
                           onClick={() => {
-                            setFile(null)
-                            setError(null)
+                            setFile(null);
+                            dismiss();
                           }}
                         >
                           <Trash></Trash>
@@ -277,7 +332,11 @@ export default function AddEquipmentPage() {
                 )}
               </div>
 
-              <Button type="submit" disabled={isLoading} className="w-full bg-blue-600 hover:bg-blue-700 py-6">
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-blue-600 hover:bg-blue-700 py-6"
+              >
                 {isLoading ? "Adding equipment..." : "Add Equipment"}
               </Button>
             </form>
@@ -285,5 +344,5 @@ export default function AddEquipmentPage() {
         </Card>
       </main>
     </div>
-  )
+  );
 }

@@ -15,7 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { toast } from "@/hooks/use-toast";
 
 interface Equipment {
   id: string;
@@ -71,8 +71,7 @@ export default function EquipmentDetailPage({
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  // Using toast notifications instead of inline error/success state
   const [isBooking, setIsBooking] = useState(false);
   const router = useRouter();
   const supabase = createClient();
@@ -90,7 +89,11 @@ export default function EquipmentDetailPage({
         setEquipment(data);
       } catch (error) {
         console.error("Error fetching equipment:", error);
-        setError("Equipment not found");
+        toast({
+          title: "Error",
+          description: "Equipment not found",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
@@ -102,12 +105,16 @@ export default function EquipmentDetailPage({
   const handleBooking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!equipment || !startDate || !endDate) {
-      setError("Please fill in all fields");
+      toast({
+        title: "Missing fields",
+        description: "Please fill in all fields",
+        variant: "destructive",
+      });
       return;
     }
 
     setIsBooking(true);
-    setError(null);
+    // clear inline error state (toasts used instead)
 
     try {
       const {
@@ -125,7 +132,11 @@ export default function EquipmentDetailPage({
       );
 
       if (days <= 0) {
-        setError("End date must be after start date");
+        toast({
+          title: "Invalid dates",
+          description: "End date must be after start date",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -148,12 +159,18 @@ export default function EquipmentDetailPage({
       if (rentalError) throw rentalError;
 
       // Do not start payment here. Rentals are paid only after vendor approves the request.
-      setSuccessMessage(
-        "Booking request created! Waiting for vendor approval..."
-      );
+      toast({
+        title: "Booking request created",
+        description: "Waiting for vendor approval...",
+        variant: "default",
+      });
       setTimeout(() => router.push("/dashboard"), 2000);
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Booking failed");
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Booking failed",
+        variant: "destructive",
+      });
     } finally {
       setIsBooking(false);
     }
@@ -242,20 +259,7 @@ export default function EquipmentDetailPage({
               </div>
 
               <form onSubmit={handleBooking} className="space-y-4">
-                {error && (
-                  <Alert className="bg-red-900/20 border-red-800">
-                    <AlertDescription className="text-red-200">
-                      {error}
-                    </AlertDescription>
-                  </Alert>
-                )}
-                {successMessage && (
-                  <Alert className="bg-green-900/20 border-green-800">
-                    <AlertDescription className="text-green-200">
-                      {successMessage}
-                    </AlertDescription>
-                  </Alert>
-                )}
+                {/* Notifications are shown via toasts (Toaster mounted in layout) */}
 
                 <div className="space-y-2">
                   <Label htmlFor="start-date" className="text-slate-200">

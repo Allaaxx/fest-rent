@@ -40,10 +40,23 @@ export async function POST(request: Request) {
       { publicUrl: publicData?.publicUrl ?? null, signedUrl: signedData?.signedUrl ?? null, path: filePath },
       { status: 201 },
     )
-  } catch (err) {
+  } catch (error) {
+    // Map common client-side errors to friendly messages for the user.
+    // Do not leak internal error details in production.
+    const raw = error instanceof Error ? error.message : String(error)
 
-    console.error(err)
-    const message = err instanceof Error ? err.message : "Upload failed"
+    // Detect the Content-Type / multipart error coming from storage/client
+    const isContentTypeError = /Content-Type was not one of|multipart\/form-data|application\/x-www-form-urlencoded/i.test(raw)
+
+    if (isContentTypeError) {
+      // Client likely sent a request with wrong content-type (debugged earlier).
+      return NextResponse.json(
+        { error: "Erro de upload: dados enviados inválidos. Por favor, envie a imagem corretamente e tente novamente." },
+        { status: 400 },
+      )
+    }
+
+    const message = process.env.NODE_ENV !== "production" ? raw : "Failed to create equipment"
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
