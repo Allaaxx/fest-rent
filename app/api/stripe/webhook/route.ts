@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing signature" }, { status: 400 });
   }
 
-  let event;
+  let event: Stripe.Event;
 
   try {
     event = stripe.webhooks.constructEvent(
@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object as any;
-    let rentalId = session.metadata?.rentalId;
+    const session = event.data.object as Stripe.Checkout.Session;
+    let rentalId = session.metadata?.rentalId as string | undefined;
 
     console.log(
       "Webhook received checkout.session.completed, rentalId=",
@@ -82,8 +82,8 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        if (found && (found as any).id) {
-          rentalId = (found as any).id;
+        if (found && (found as { id?: string }).id) {
+          rentalId = (found as { id?: string }).id;
           console.log(
             "Found rental by stripe_payment_id in webhook, rentalId=",
             rentalId
