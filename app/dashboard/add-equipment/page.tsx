@@ -66,7 +66,7 @@ export default function AddEquipmentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
+    <div className="min-h-screen bg-linear-to-br from-slate-900 to-slate-800">
       {/* Header */}
       <header className="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm">
         <nav className="mx-auto max-w-7xl flex items-center justify-between px-6 py-4">
