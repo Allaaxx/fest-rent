@@ -167,7 +167,10 @@ export async function POST(request: NextRequest) {
           console.log("Found rental for expired session, rentalId=", rentalId);
         }
       } catch (err) {
-        console.error("Exception while finding rental for expired session:", err);
+        console.error(
+          "Exception while finding rental for expired session:",
+          err
+        );
       }
     }
 
@@ -183,12 +186,21 @@ export async function POST(request: NextRequest) {
           .eq("id", rentalId);
 
         if (updateErr) {
-          console.error("Failed to update rental for expired session:", updateErr);
+          console.error(
+            "Failed to update rental for expired session:",
+            updateErr
+          );
         } else {
-          console.log("Cleared stripe_payment_id and restored status=approved for rental", rentalId);
+          console.log(
+            "Cleared stripe_payment_id and restored status=approved for rental",
+            rentalId
+          );
         }
       } catch (err) {
-        console.error("Exception while updating rental for expired session:", err);
+        console.error(
+          "Exception while updating rental for expired session:",
+          err
+        );
       }
     }
   }
