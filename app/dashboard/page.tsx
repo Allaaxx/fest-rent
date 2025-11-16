@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -253,11 +254,14 @@ export default function DashboardPage() {
                                       const url = payload.url;
                                       if (url) window.location.href = url;
                                     } catch (err) {
-                                      alert(
-                                        err instanceof Error
-                                          ? err.message
-                                          : String(err)
-                                      );
+                                      toast({
+                                        title: "Checkout error",
+                                        description:
+                                          err instanceof Error
+                                            ? err.message
+                                            : String(err),
+                                        variant: "destructive",
+                                      });
                                     }
                                   }}
                                   className="bg-blue-600 hover:bg-blue-700"
