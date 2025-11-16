@@ -1,95 +1,76 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const form = await request.formData();
-    const file = form.get("file") as File | null;
+    const body = await request.json();
+    const { name, description, category, price_per_day, image_url } =
+      body || {};
 
-    if (!file) {
-      return NextResponse.json({ error: "No file provided" }, { status: 400 });
-    }
-
-    const filename = `${Date.now()}_${file.name.replace(
-      /[^a-zA-Z0-9_.-]/g,
-      "_"
-    )}`;
-    const filePath = `equipment/${filename}`;
-
-    if (
-      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      !process.env.SUPABASE_SERVICE_ROLE_KEY
-    ) {
+    // Basic validation
+    if (!name || !category || price_per_day == null) {
       return NextResponse.json(
-        { error: "Missing Supabase configuration on server" },
-        { status: 500 }
-      );
-    }
-
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-
-    // Read file into buffer
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const { error } = await supabase.storage
-      .from("equipment-images")
-      .upload(filePath, buffer, {
-        contentType: file.type,
-        cacheControl: "3600",
-        upsert: false,
-      });
-
-    if (error) {
-      console.error("Supabase server upload error:", error);
-      throw error;
-    }
-
-    const { data: publicData } = supabase.storage
-      .from("equipment-images")
-      .getPublicUrl(filePath);
-    // Also create a signed URL as a fallback for private buckets
-    const { data: signedData } = await supabase.storage
-      .from("equipment-images")
-      .createSignedUrl(filePath, 60 * 60);
-
-    return NextResponse.json(
-      {
-        publicUrl: publicData?.publicUrl ?? null,
-        signedUrl: signedData?.signedUrl ?? null,
-        path: filePath,
-      },
-      { status: 201 }
-    );
-  } catch (error) {
-    // Map common client-side errors to friendly messages for the user.
-    // Do not leak internal error details in production.
-    const raw = error instanceof Error ? error.message : String(error);
-
-    // Detect the Content-Type / multipart error coming from storage/client
-    const isContentTypeError =
-      /Content-Type was not one of|multipart\/form-data|application\/x-www-form-urlencoded/i.test(
-        raw
-      );
-
-    if (isContentTypeError) {
-      // Client likely sent a request with wrong content-type (debugged earlier).
-      return NextResponse.json(
-        {
-          error:
-            "Erro de upload: dados enviados inválidos. Por favor, envie a imagem corretamente e tente novamente.",
-        },
+        { error: "Missing required fields: name, category, price_per_day" },
         { status: 400 }
       );
     }
 
-    const message =
-      process.env.NODE_ENV !== "production"
-        ? raw
-        : "Failed to create equipment";
+    // Get server-side supabase client (reads cookies to find the user)
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (
+      !process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      !process.env.NEXT_PUBLIC_SUPABASE_URL
+    ) {
+      return NextResponse.json(
+        { error: "Missing Supabase server configuration" },
+        { status: 500 }
+      );
+    }
+
+    // Use admin client to bypass RLS for inserts where necessary
+    const admin = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    const insertPayload = {
+      owner_id: user.id,
+      name,
+      description: description ?? null,
+      category,
+      price_per_day: Number(price_per_day),
+      image_url: image_url ?? null,
+    } as any;
+
+    const { data, error } = await admin
+      .from("equipment")
+      .insert([insertPayload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Failed to insert equipment:", error);
+      // If it's a foreign key / RLS issue, surface a helpful message in non-prod
+      const message =
+        process.env.NODE_ENV !== "production"
+          ? error.message
+          : "Failed to create equipment";
+      return NextResponse.json({ error: message }, { status: 500 });
+    }
+
+    return NextResponse.json({ data }, { status: 201 });
+  } catch (err) {
+    console.error(err);
+    const message = err instanceof Error ? err.message : "Server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
