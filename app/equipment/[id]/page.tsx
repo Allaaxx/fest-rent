@@ -28,24 +28,45 @@ interface Equipment {
   owner_id: string;
 }
 
-export default function EquipmentDetailPage({ params }: { params: { id?: string } | Promise<{ id?: string }> }) {
+export default function EquipmentDetailPage({
+  params,
+}: {
+  params: { id?: string } | Promise<{ id?: string }>;
+}) {
   // `params` may be a plain object or a Promise<{ id?: string }>
-  // Extract id synchronously if available, otherwise resolve the promise in an effect.
-  const initialId = params && typeof (params as { id?: string }).id === 'string' ? (params as { id?: string }).id : undefined;
-  const [id, setId] = useState<string | undefined>(initialId);
+  // Prefer unwrapping via the React.use() helper when available (Next.js client components),
+  // otherwise resolve a potential Promise in an effect.
+  type ReactUseFn = <T>(v: T | Promise<T>) => T | undefined;
+  const reactUse = (React as unknown as { use?: ReactUseFn }).use;
+  const resolvedSync = reactUse
+    ? reactUse(params as { id?: string } | Promise<{ id?: string }>)
+    : undefined;
+  const [id, setId] = useState<string | undefined>(resolvedSync?.id);
 
   useEffect(() => {
-    // If params is a Promise, resolve it and set id
-    const maybePromise = params as Promise<{ id?: string }> | { id?: string } | undefined;
+    if (resolvedSync && resolvedSync.id) {
+      // already unwrapped via React.use
+      setId(resolvedSync.id);
+      return;
+    }
 
+    const maybePromise = params as
+      | Promise<{ id?: string }>
+      | { id?: string }
+      | undefined;
     const isPromise = (p: unknown): p is Promise<{ id?: string }> =>
       !!p && typeof (p as Promise<{ id?: string }>).then === "function";
 
     if (isPromise(maybePromise)) {
       maybePromise.then((p) => setId(p?.id)).catch(() => {});
+    } else if (
+      maybePromise &&
+      typeof (maybePromise as { id?: string }).id === "string"
+    ) {
+      // params is a plain object
+      setId((maybePromise as { id?: string }).id);
     }
-    // otherwise id already set from initialId
-  }, [params]);
+  }, [params, resolvedSync]);
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [loading, setLoading] = useState(true);
   const [startDate, setStartDate] = useState("");
