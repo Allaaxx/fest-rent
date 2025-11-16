@@ -33,15 +33,9 @@ export async function POST(request: Request) {
     }
 
     const { data: publicData } = supabase.storage.from("equipment-images").getPublicUrl(filePath)
-    // Also create a signed URL as a fallback for private buckets
-    const { data: signedData } = await supabase.storage.from("equipment-images").createSignedUrl(filePath, 60 * 60)
 
-    return NextResponse.json(
-      { publicUrl: publicData?.publicUrl ?? null, signedUrl: signedData?.signedUrl ?? null, path: filePath },
-      { status: 201 },
-    )
+    return NextResponse.json({ publicUrl: publicData?.publicUrl ?? null, path: filePath }, { status: 201 })
   } catch (err) {
-
     console.error(err)
     const message = err instanceof Error ? err.message : "Upload failed"
     return NextResponse.json({ error: message }, { status: 500 })
