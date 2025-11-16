@@ -67,11 +67,12 @@ export async function POST(request: NextRequest) {
       refresh_url: refreshUrl,
       return_url: returnUrl,
       type: "account_onboarding",
-    } as any);
+    } as Stripe.AccountLinkCreateParams);
 
+    const typed = accountLink as Stripe.AccountLink;
     return NextResponse.json({
       account_id: accountId,
-      url: (accountLink as any).url,
+      url: typed.url,
     });
   } catch (error) {
     console.error("Stripe error:", error);
