@@ -10,6 +10,7 @@ export async function GET() {
     if (error) throw error
 
     return NextResponse.json(data)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch equipment" }, { status: 500 })
   }
@@ -45,6 +46,7 @@ export async function POST(request: NextRequest) {
     if (error) throw error
 
     return NextResponse.json(data, { status: 201 })
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (error) {
     return NextResponse.json({ error: "Failed to create equipment" }, { status: 500 })
   }
