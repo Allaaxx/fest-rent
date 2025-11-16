@@ -106,7 +106,6 @@ describe("Rental Management", () => {
 
   describe("Rental Status Management", () => {
     it("should transition from pending to approved", () => {
-      const rental = { ...mockRental }
       const statusFlow = ["pending", "approved", "completed"]
       expect(statusFlow).toContain("pending")
       expect(statusFlow).toContain("approved")
