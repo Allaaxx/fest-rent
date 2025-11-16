@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient();
+  const [processing, setProcessing] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -232,6 +233,7 @@ export default function DashboardPage() {
                               return (
                                 <Button
                                   onClick={async () => {
+                                    setProcessing(rental.id);
                                     try {
                                       const res = await fetch(
                                         "/api/stripe/checkout",
@@ -262,11 +264,21 @@ export default function DashboardPage() {
                                             : String(err),
                                         variant: "destructive",
                                       });
+                                    } finally {
+                                      setProcessing(null);
                                     }
                                   }}
-                                  className="bg-blue-600 hover:bg-blue-700"
+                                  disabled={processing === rental.id}
+                                  className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2"
                                 >
-                                  Pay
+                                  {processing === rental.id ? (
+                                    <>
+                                      <Spinner className="h-4 w-4 text-white" />
+                                      Processing...
+                                    </>
+                                  ) : (
+                                    "Pay"
+                                  )}
                                 </Button>
                               );
                             }
