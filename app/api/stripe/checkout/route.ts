@@ -121,7 +121,6 @@ export async function POST(request: NextRequest) {
 
     // Platform fee: 15%
     const platformFee = Math.round(amount * 0.15);
-    const vendorAmount = amount - platformFee;
 
     // Create checkout session with transfer to connected account using
     // `payment_intent_data.transfer_data`. The top-level `transfer_data`
@@ -153,12 +152,12 @@ export async function POST(request: NextRequest) {
         // application_fee_amount is charged to the customer and paid to the
         // platform. Amounts are in cents.
         application_fee_amount: platformFee,
-      } as any,
+      },
       metadata: {
         rentalId,
         userId: user.id,
       },
-    } as any);
+    } as Stripe.Checkout.SessionCreateParams);
 
     // Update rental with Stripe session ID
     const { error: updateError } = await supabase
@@ -169,9 +168,10 @@ export async function POST(request: NextRequest) {
     if (updateError) throw updateError;
 
     // Return session id and hosted checkout URL so client can redirect
+    const typedSession = session as Stripe.Checkout.Session;
     return NextResponse.json({
-      sessionId: session.id,
-      url: (session as any).url,
+      sessionId: typedSession.id,
+      url: typedSession.url,
     });
   } catch (error) {
     console.error("Stripe error:", error);
