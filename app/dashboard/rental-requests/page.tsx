@@ -79,6 +79,10 @@ export default function RentalRequestsPage() {
           r.id === rentalId ? { ...r, status: "approved" } : r
         )
       );
+      toast({
+        title: "Pedido aprovado",
+        description: "O pedido foi aprovado com sucesso.",
+      });
     } catch (error) {
       toast({
         title: "Error",
@@ -107,6 +111,10 @@ export default function RentalRequestsPage() {
           r.id === rentalId ? { ...r, status: "rejected" } : r
         )
       );
+      toast({
+        title: "Pedido recusado",
+        description: "O pedido foi recusado com sucesso.",
+      });
     } catch (error) {
       toast({
         title: "Error",
