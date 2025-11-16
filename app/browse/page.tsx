@@ -116,6 +116,7 @@ export default function BrowsePage() {
                 <Card className="bg-slate-800 border-slate-700 hover:border-blue-600 cursor-pointer transition-all h-full">
                   <div className="w-full h-48 bg-slate-700 overflow-hidden rounded-t-lg">
                     {item.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={item.image_url}
                         alt={item.name}
