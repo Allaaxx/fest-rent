@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { type NextRequest, NextResponse } from "next/server";
 
-export async function POST(request: NextRequest, { params }: { params: any }) {
+export async function POST(request: NextRequest, { params }: { params: unknown }) {
   try {
     const supabase = await createClient();
     const {
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: { params: any }) {
     }
 
     // `params` may be a Promise in Next.js 16; await it and read `id`
-    const resolvedParams = await params;
+    const resolvedParams = (await params) as { id?: string } | undefined;
     const id = resolvedParams?.id;
 
     // Verify user is the equipment owner
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, { params }: { params: any }) {
     if (error) throw error;
 
     return NextResponse.json(data);
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Failed to approve rental" },
       { status: 500 }
