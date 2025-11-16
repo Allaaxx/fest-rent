@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       );
     }
 
-    const rentalIds = (rentals || []).map((r: any) => r.id);
+    const rentalIds = (rentals || []).map((r: { id?: string }) => r.id as string).filter(Boolean);
     if (rentalIds.length === 0) {
       const debug = new URL(request.url).searchParams.get("debug");
       if (debug === "1" || process.env.NODE_ENV !== "production") {
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
     }
 
     const total = (payments || []).reduce(
-      (sum: number, p: any) => sum + Number(p.amount || 0),
+      (sum: number, p: { amount?: number | string }) => sum + Number(p.amount || 0),
       0
     );
 
