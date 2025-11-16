@@ -80,8 +80,8 @@ export default function RentalRequestsPage() {
         )
       );
       toast({
-        title: "Pedido aprovado",
-        description: "O pedido foi aprovado com sucesso.",
+        title: "Request approved",
+        description: "The rental request was approved successfully.",
       });
     } catch (error) {
       toast({
@@ -112,8 +112,8 @@ export default function RentalRequestsPage() {
         )
       );
       toast({
-        title: "Pedido recusado",
-        description: "O pedido foi recusado com sucesso.",
+        title: "Request rejected",
+        description: "The rental request was rejected successfully.",
       });
     } catch (error) {
       toast({
