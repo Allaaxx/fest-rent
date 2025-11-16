@@ -1,105 +1,115 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Spinner } from "@/components/ui/spinner"
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Spinner } from "@/components/ui/spinner";
 
 interface User {
-  id: string
-  email: string
-  name: string
-  role: string
-  created_at: string
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  created_at: string;
 }
 
 interface Equipment {
-  id: string
-  name: string
-  category: string
-  price_per_day: number
-  available: boolean
-  created_at: string
+  id: string;
+  name: string;
+  category: string;
+  price_per_day: number;
+  available: boolean;
+  created_at: string;
 }
 
 interface Rental {
-  id: string
-  start_date: string
-  end_date: string
-  total_value: number
-  status: string
-  created_at: string
+  id: string;
+  start_date: string;
+  end_date: string;
+  total_value: number;
+  status: string;
+  created_at: string;
 }
 
 export default function AdminPage() {
-  const [users, setUsers] = useState<User[]>([])
-  const [equipment, setEquipment] = useState<Equipment[]>([])
-  const [rentals, setRentals] = useState<Rental[]>([])
-  const [loading, setLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const router = useRouter()
-  const supabase = createClient()
+  const [users, setUsers] = useState<User[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [rentals, setRentals] = useState<Rental[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const router = useRouter();
+  const supabase = createClient();
 
   useEffect(() => {
     const fetchAdminData = async () => {
       try {
         const {
           data: { user: authUser },
-        } = await supabase.auth.getUser()
+        } = await supabase.auth.getUser();
 
         if (!authUser) {
-          router.push("/auth/login")
-          return
+          router.push("/auth/login");
+          return;
         }
 
-        // Check if user is admin
-        const { data: userData, error: userError } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", authUser.id)
-          .single()
+        // Check if user is admin by calling admin endpoint that uses
+        // the service role key (avoids RLS issues). If endpoint returns
+        // 200, it contains the list of all users.
+        try {
+          const adminResp = await fetch("/api/admin/users");
+          if (!adminResp.ok) {
+            router.push("/dashboard");
+            return;
+          }
 
-        if (userError || userData?.role !== "admin") {
-          router.push("/dashboard")
-          return
+          const adminJson = await adminResp.json();
+          setIsAdmin(true);
+          setUsers(adminJson.users || []);
+        } catch (err) {
+          console.error("Failed to fetch admin users:", err);
+          router.push("/dashboard");
+          return;
         }
-
-        setIsAdmin(true)
-
-        // Fetch all users
-        const { data: usersData, error: usersError } = await supabase.from("users").select("*")
-
-        if (!usersError) setUsers(usersData || [])
 
         // Fetch all equipment
-        const { data: equipmentData, error: equipmentError } = await supabase.from("equipment").select("*")
+        const { data: equipmentData, error: equipmentError } = await supabase
+          .from("equipment")
+          .select("*");
 
-        if (!equipmentError) setEquipment(equipmentData || [])
+        if (!equipmentError) setEquipment(equipmentData || []);
 
         // Fetch all rentals
-        const { data: rentalsData, error: rentalsError } = await supabase.from("rentals").select("*")
+        const { data: rentalsData, error: rentalsError } = await supabase
+          .from("rentals")
+          .select("*");
 
-        if (!rentalsError) setRentals(rentalsData || [])
+        if (!rentalsError) setRentals(rentalsData || []);
       } catch (error) {
-        console.error("Error fetching admin data:", error)
+        console.error("Error fetching admin data:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchAdminData()
-  }, [router, supabase])
+    fetchAdminData();
+  }, [router, supabase]);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-slate-900 to-slate-800">
         <Spinner className="text-blue-500" />
       </div>
-    )
+    );
   }
 
   if (!isAdmin) {
@@ -111,15 +121,20 @@ export default function AdminPage() {
           </CardContent>
         </Card>
       </div>
-    )
+    );
   }
 
   const stats = [
     { label: "Total Users", value: users.length },
     { label: "Total Equipment", value: equipment.length },
     { label: "Total Rentals", value: rentals.length },
-    { label: "Revenue", value: `$${rentals.reduce((sum, r) => sum + r.total_value, 0).toFixed(2)}` },
-  ]
+    {
+      label: "Revenue",
+      value: `$${rentals
+        .reduce((sum, r) => sum + r.total_value, 0)
+        .toFixed(2)}`,
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-900 to-slate-800">
@@ -131,7 +146,10 @@ export default function AdminPage() {
           </Link>
           <div className="flex gap-4">
             <Link href="/dashboard">
-              <Button variant="ghost" className="text-slate-300 hover:text-white">
+              <Button
+                variant="ghost"
+                className="text-slate-300 hover:text-white"
+              >
                 Dashboard
               </Button>
             </Link>
@@ -179,7 +197,10 @@ export default function AdminPage() {
               <CardContent>
                 <div className="space-y-4">
                   {users.map((user) => (
-                    <div key={user.id} className="flex justify-between items-center p-4 bg-slate-700 rounded-lg">
+                    <div
+                      key={user.id}
+                      className="flex justify-between items-center p-4 bg-slate-700 rounded-lg"
+                    >
                       <div>
                         <p className="font-semibold text-white">{user.name}</p>
                         <p className="text-sm text-slate-400">{user.email}</p>
@@ -202,16 +223,25 @@ export default function AdminPage() {
               <CardContent>
                 <div className="space-y-4">
                   {equipment.map((item) => (
-                    <div key={item.id} className="flex justify-between items-center p-4 bg-slate-700 rounded-lg">
+                    <div
+                      key={item.id}
+                      className="flex justify-between items-center p-4 bg-slate-700 rounded-lg"
+                    >
                       <div>
                         <p className="font-semibold text-white">{item.name}</p>
-                        <p className="text-sm text-slate-400">{item.category}</p>
+                        <p className="text-sm text-slate-400">
+                          {item.category}
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-blue-400">${item.price_per_day.toFixed(2)}/day</p>
+                        <p className="font-semibold text-blue-400">
+                          ${item.price_per_day.toFixed(2)}/day
+                        </p>
                         <span
                           className={`inline-block mt-1 px-2 py-1 rounded text-xs font-semibold ${
-                            item.available ? "bg-green-900/30 text-green-300" : "bg-red-900/30 text-red-300"
+                            item.available
+                              ? "bg-green-900/30 text-green-300"
+                              : "bg-red-900/30 text-red-300"
                           }`}
                         >
                           {item.available ? "Available" : "Unavailable"}
@@ -232,25 +262,33 @@ export default function AdminPage() {
               <CardContent>
                 <div className="space-y-4">
                   {rentals.map((rental) => (
-                    <div key={rental.id} className="flex justify-between items-center p-4 bg-slate-700 rounded-lg">
+                    <div
+                      key={rental.id}
+                      className="flex justify-between items-center p-4 bg-slate-700 rounded-lg"
+                    >
                       <div>
                         <p className="font-semibold text-white">
                           {rental.start_date} to {rental.end_date}
                         </p>
-                        <p className="text-sm text-slate-400">ID: {rental.id.substring(0, 8)}...</p>
+                        <p className="text-sm text-slate-400">
+                          ID: {rental.id.substring(0, 8)}...
+                        </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-blue-400">${rental.total_value.toFixed(2)}</p>
+                        <p className="font-semibold text-blue-400">
+                          ${rental.total_value.toFixed(2)}
+                        </p>
                         <span
                           className={`inline-block mt-1 px-2 py-1 rounded text-xs font-semibold ${
                             rental.status === "approved"
                               ? "bg-green-900/30 text-green-300"
                               : rental.status === "pending"
-                                ? "bg-yellow-900/30 text-yellow-300"
-                                : "bg-red-900/30 text-red-300"
+                              ? "bg-yellow-900/30 text-yellow-300"
+                              : "bg-red-900/30 text-red-300"
                           }`}
                         >
-                          {rental.status.charAt(0).toUpperCase() + rental.status.slice(1)}
+                          {rental.status.charAt(0).toUpperCase() +
+                            rental.status.slice(1)}
                         </span>
                       </div>
                     </div>
@@ -262,5 +300,5 @@ export default function AdminPage() {
         </Tabs>
       </main>
     </div>
-  )
+  );
 }

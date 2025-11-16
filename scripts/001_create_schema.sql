@@ -17,7 +17,17 @@ ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view their own data"
   ON public.users FOR SELECT
-  USING (auth.uid() = id OR role = 'admin');
+  -- Allow a user to read their own row, or allow a requester whose
+  -- profile has role = 'admin' to read all rows. The previous policy
+  -- checked the row's `role` column which only allowed reading rows
+  -- that themselves had role='admin'. We need to check the requester's
+  -- role instead (lookup by auth.uid()).
+  USING (
+    auth.uid() = id
+    OR (
+      (SELECT role FROM public.users WHERE id = auth.uid()) = 'admin'
+    )
+  );
 
 CREATE POLICY "Users can update their own data"
   ON public.users FOR UPDATE
