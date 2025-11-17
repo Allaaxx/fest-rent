@@ -23,17 +23,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Missing signature" }, { status: 400 });
   }
 
-  let event: Stripe.Event;
+  let event: Stripe.Event | undefined;
+  const primarySecret = process.env.STRIPE_WEBHOOK_SECRET as string | undefined;
+  const fallbackSecret = process.env.STRIPE_WEBHOOK_SECRET_FALLBACK as
+    | string
+    | undefined;
 
   try {
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET as string
-    );
-  } catch (error) {
-    console.error("Webhook signature verification failed:", error);
-    return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    if (!primarySecret) throw new Error("Primary webhook secret not set");
+    event = stripe.webhooks.constructEvent(body, signature, primarySecret);
+  } catch (primaryErr) {
+    // If a fallback secret is configured (for CLI/testing), try it before failing.
+    if (fallbackSecret) {
+      try {
+        event = stripe.webhooks.constructEvent(body, signature, fallbackSecret);
+        console.warn("Webhook signature verified using fallback secret");
+      } catch (fallbackErr) {
+        console.error(
+          "Webhook signature verification failed (primary+fallback):",
+          primaryErr,
+          fallbackErr
+        );
+        return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+      }
+    } else {
+      console.error("Webhook signature verification failed:", primaryErr);
+      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+    }
   }
 
   // Create a Supabase client. For webhooks (which are unauthenticated requests)
@@ -51,7 +67,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  if (event.type === "checkout.session.completed") {
+  const writeErrors: string[] = [];
+
+  if (event && event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     let rentalId = session.metadata?.rentalId as string | undefined;
 
@@ -113,33 +131,52 @@ export async function POST(request: NextRequest) {
 
         if (updateError) {
           console.error("Failed to update rental from webhook:", updateError);
+          writeErrors.push("rental-update: " + JSON.stringify(updateError));
         } else {
           console.log("Updated rental from webhook:", updatedRental);
         }
       } catch (err) {
         console.error("Exception while updating rental from webhook:", err);
+        writeErrors.push("rental-update-exception: " + String(err));
       }
 
-      // Create payment record (guard against nullable amount_total)
+      // Create payment record (idempotent by stripe_session_id)
       try {
         const totalCents = (session.amount_total ?? 0) as number;
-        const { data: paymentRow, error: paymentError } = await supabase
-          .from("payments")
-          .insert({
-            rental_id: rentalId,
-            amount: totalCents / 100,
-            status: "completed",
-            stripe_session_id: session.id,
-          })
-          .select();
 
-        if (paymentError) {
-          console.error("Failed to insert payment from webhook:", paymentError);
+        const { data: existing, error: existingErr } = await supabase
+          .from("payments")
+          .select("id")
+          .eq("stripe_session_id", session.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingErr) {
+          console.error("Error checking existing payment:", existingErr);
+          writeErrors.push("payment-existence-check: " + JSON.stringify(existingErr));
+        } else if (existing && (existing as { id?: string }).id) {
+          console.log("Payment already exists for stripe_session_id, skipping insert", session.id);
         } else {
-          console.log("Inserted payment from webhook:", paymentRow);
+          const { data: paymentRow, error: paymentError } = await supabase
+            .from("payments")
+            .insert({
+              rental_id: rentalId,
+              amount: totalCents / 100,
+              status: "completed",
+              stripe_session_id: session.id,
+            })
+            .select();
+
+          if (paymentError) {
+            console.error("Failed to insert payment from webhook:", paymentError);
+            writeErrors.push("payment-insert: " + JSON.stringify(paymentError));
+          } else {
+            console.log("Inserted payment from webhook:", paymentRow);
+          }
         }
       } catch (err) {
         console.error("Exception while inserting payment from webhook:", err);
+        writeErrors.push("payment-insert-exception: " + String(err));
       }
     }
   }
@@ -190,6 +227,7 @@ export async function POST(request: NextRequest) {
             "Failed to update rental for expired session:",
             updateErr
           );
+          writeErrors.push("rental-expire-update: " + JSON.stringify(updateErr));
         } else {
           console.log(
             "Cleared stripe_payment_id and restored status=approved for rental",
@@ -201,8 +239,15 @@ export async function POST(request: NextRequest) {
           "Exception while updating rental for expired session:",
           err
         );
+        writeErrors.push("rental-expire-exception: " + String(err));
       }
     }
+  }
+
+  if (writeErrors.length > 0) {
+    console.error("Webhook encountered write errors:", writeErrors);
+    // Return 500 to ask Stripe to retry delivery
+    return NextResponse.json({ error: "write-failed", details: writeErrors }, { status: 500 });
   }
 
   return NextResponse.json({ received: true });
