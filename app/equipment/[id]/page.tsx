@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -73,6 +74,23 @@ export default function EquipmentDetailPage({
   const [endDate, setEndDate] = useState("");
   // Using toast notifications instead of inline error/success state
   const [isBooking, setIsBooking] = useState(false);
+  const [showFullDesc, setShowFullDesc] = useState(false);
+  const descRef = useRef<HTMLDivElement | null>(null);
+  const [descHeight, setDescHeight] = useState<number>(0);
+
+  useEffect(() => {
+    const updateHeight = () => {
+      if (descRef.current) setDescHeight(descRef.current.scrollHeight);
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(() => updateHeight());
+      if (descRef.current) ro.observe(descRef.current);
+      return () => ro.disconnect();
+    }
+  }, [equipment]);
   const router = useRouter();
   const supabase = createClient();
 
@@ -255,7 +273,46 @@ export default function EquipmentDetailPage({
 
               <div>
                 <p className="text-slate-300 mb-2">Description</p>
-                <p className="text-slate-400">{equipment.description}</p>
+                {equipment.description ? (
+                  <div className="relative">
+                    <div
+                      ref={descRef}
+                      className="text-slate-400 whitespace-pre-line overflow-hidden"
+                      style={{
+                        maxHeight: showFullDesc ? `${descHeight}px` : 96,
+                        transition: "max-height 300ms ease",
+                      }}
+                    >
+                      {equipment.description}
+                    </div>
+
+                    {/* gradient overlay when truncated */}
+                    {!showFullDesc && equipment.description.length > 300 && (
+                      <div className="pointer-events-none absolute left-0 right-0 bottom-0 h-16 bg-linear-to-t " />
+                    )}
+
+                    {equipment.description.length > 300 && (
+                      <div className="mt-2 flex items-center">
+                        <Button
+                          variant="ghost"
+                          className="text-blue-400 flex items-center gap-2"
+                          onClick={() => setShowFullDesc((s) => !s)}
+                          type="button"
+                        >
+                          {showFullDesc ? "Ver menos" : "Ver mais"}
+                          <ChevronDown
+                            className={`transition-transform duration-300 ${
+                              showFullDesc ? "rotate-180" : ""
+                            }`}
+                            size={16}
+                          />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-slate-400">No description provided</p>
+                )}
               </div>
 
               <form onSubmit={handleBooking} className="space-y-4">
