@@ -1,62 +1,82 @@
-"use client"
+"use client";
 
-import { useEffect, useState } from "react"
-import Link from "next/link"
-import { createClient } from "@/lib/supabase/client"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Spinner } from "@/components/ui/spinner"
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
 
 interface Equipment {
-  id: string
-  name: string
-  description: string
-  category: string
-  price_per_day: number
-  image_url: string | null
-  available: boolean
-  owner_id: string
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  price_per_day: number;
+  image_url: string | null;
+  available: boolean;
+  owner_id: string;
 }
 
-const CATEGORIES = ["Audio", "Video", "Lighting", "Tent", "Table", "Chair", "Decoration", "Other"]
+const CATEGORIES = [
+  "Audio",
+  "Video",
+  "Lighting",
+  "Tent",
+  "Table",
+  "Chair",
+  "Decoration",
+  "Other",
+];
 
 export default function BrowsePage() {
-  const [equipment, setEquipment] = useState<Equipment[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const supabase = createClient()
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const supabase = createClient();
 
   useEffect(() => {
     const fetchEquipment = async () => {
       try {
-        let query = supabase.from("equipment").select("*").eq("available", true)
+        let query = supabase
+          .from("equipment")
+          .select("*")
+          .eq("available", true);
 
         if (selectedCategory && selectedCategory !== "all") {
-          query = query.eq("category", selectedCategory)
+          query = query.eq("category", selectedCategory);
         }
 
-        const { data, error } = await query
+        const { data, error } = await query;
 
-        if (error) throw error
+        if (error) throw error;
 
-        let filtered = (data as Equipment[]) || []
+        let filtered = (data as Equipment[]) || [];
         if (searchTerm) {
-          filtered = filtered.filter((item: Equipment) => item.name.toLowerCase().includes(searchTerm.toLowerCase()))
+          filtered = filtered.filter((item: Equipment) =>
+            item.name.toLowerCase().includes(searchTerm.toLowerCase())
+          );
         }
 
-        setEquipment(filtered)
+        setEquipment(filtered);
       } catch (error) {
-        console.error("Error fetching equipment:", error)
+        console.error("Error fetching equipment:", error);
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchEquipment()
-  }, [selectedCategory, searchTerm, supabase])
+    fetchEquipment();
+  }, [selectedCategory, searchTerm, supabase]);
 
   return (
     <div className="min-h-screen bg-linear-to-br from-slate-900 to-slate-800">
@@ -83,7 +103,10 @@ export default function BrowsePage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
           />
-          <Select value={selectedCategory || "all"} onValueChange={setSelectedCategory}>
+          <Select
+            value={selectedCategory || "all"}
+            onValueChange={setSelectedCategory}
+          >
             <SelectTrigger className="w-full md:w-48 bg-slate-700 border-slate-600 text-white">
               <SelectValue />
             </SelectTrigger>
@@ -110,26 +133,36 @@ export default function BrowsePage() {
             <p className="text-slate-300 text-lg">No equipment found</p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 justify-items-center">
             {equipment.map((item) => (
-              <Link key={item.id} href={`/equipment/${item.id}`}>
-                <Card className="bg-slate-800 border-slate-700 hover:border-blue-600 cursor-pointer transition-all h-full">
-                  <div className="w-full h-48 bg-slate-700 overflow-hidden rounded-t-lg">
+              <Link
+                key={item.id}
+                href={`/equipment/${item.id}`}
+                className="block w-full"
+              >
+                <Card className="bg-slate-800 border-slate-700 hover:border-blue-600 cursor-pointer transition-all h-full mx-auto w-full max-w-[720px]">
+                  <div className="w-full h-40 sm:h-48 md:h-56 lg:h-64 bg-slate-700 overflow-hidden rounded-t-lg">
                     {item.image_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
                         src={item.image_url}
                         alt={item.name}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-center transition-transform duration-200 ease-out hover:scale-105"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-500">No image</div>
+                      <div className="w-full h-full flex items-center justify-center text-slate-500">
+                        No image
+                      </div>
                     )}
                   </div>
                   <CardContent className="pt-4">
-                    <h3 className="font-semibold text-white truncate">{item.name}</h3>
+                    <h3 className="font-semibold text-white truncate">
+                      {item.name}
+                    </h3>
                     <p className="text-sm text-slate-400">{item.category}</p>
-                    <p className="text-blue-400 font-bold mt-2">${item.price_per_day}/day</p>
+                    <p className="text-blue-400 font-bold mt-2">
+                      ${item.price_per_day}/day
+                    </p>
                   </CardContent>
                 </Card>
               </Link>
@@ -138,5 +171,5 @@ export default function BrowsePage() {
         )}
       </main>
     </div>
-  )
+  );
 }
