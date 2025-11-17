@@ -44,7 +44,10 @@ export async function POST(request: NextRequest) {
           primaryErr,
           fallbackErr
         );
-        return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Invalid signature" },
+          { status: 400 }
+        );
       }
     } else {
       console.error("Webhook signature verification failed:", primaryErr);
@@ -153,9 +156,14 @@ export async function POST(request: NextRequest) {
 
         if (existingErr) {
           console.error("Error checking existing payment:", existingErr);
-          writeErrors.push("payment-existence-check: " + JSON.stringify(existingErr));
+          writeErrors.push(
+            "payment-existence-check: " + JSON.stringify(existingErr)
+          );
         } else if (existing && (existing as { id?: string }).id) {
-          console.log("Payment already exists for stripe_session_id, skipping insert", session.id);
+          console.log(
+            "Payment already exists for stripe_session_id, skipping insert",
+            session.id
+          );
         } else {
           const { data: paymentRow, error: paymentError } = await supabase
             .from("payments")
@@ -168,7 +176,10 @@ export async function POST(request: NextRequest) {
             .select();
 
           if (paymentError) {
-            console.error("Failed to insert payment from webhook:", paymentError);
+            console.error(
+              "Failed to insert payment from webhook:",
+              paymentError
+            );
             writeErrors.push("payment-insert: " + JSON.stringify(paymentError));
           } else {
             console.log("Inserted payment from webhook:", paymentRow);
@@ -227,7 +238,9 @@ export async function POST(request: NextRequest) {
             "Failed to update rental for expired session:",
             updateErr
           );
-          writeErrors.push("rental-expire-update: " + JSON.stringify(updateErr));
+          writeErrors.push(
+            "rental-expire-update: " + JSON.stringify(updateErr)
+          );
         } else {
           console.log(
             "Cleared stripe_payment_id and restored status=approved for rental",
@@ -247,7 +260,10 @@ export async function POST(request: NextRequest) {
   if (writeErrors.length > 0) {
     console.error("Webhook encountered write errors:", writeErrors);
     // Return 500 to ask Stripe to retry delivery
-    return NextResponse.json({ error: "write-failed", details: writeErrors }, { status: 500 });
+    return NextResponse.json(
+      { error: "write-failed", details: writeErrors },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ received: true });
